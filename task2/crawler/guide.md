@@ -2,132 +2,187 @@
 
 ## 项目概述
 
-本项目是一个基于 Python 的通用爬虫平台,支持多种爬虫任务的统一管理和调度。采用前后端分离架构,通过 HTTP API 提供服务,数据持久化到 PostgreSQL 数据库。
+本项目是一个基于 Python 的通用爬虫平台，支持多种爬虫任务的统一管理和调度。采用 **DDD (领域驱动设计) + Clean Architecture** 架构，通过 **Protocol Buffers** 定义 API 接口，数据持久化到 PostgreSQL 数据库。
 
 ### 核心特性
 
-- **可复用的爬虫核心引擎**:抽象出通用的爬虫组件,支持快速扩展新的爬虫任务
-- **统一的 API 接口**:通过 Protocol Buffers 定义接口规范
-- **数据持久化**:使用 PostgreSQL + SQLAlchemy ORM
-- **任务调度**:支持异步任务和定时任务
-- **灵活配置**:支持多种爬虫策略(requests、Selenium、API 调用)
+- **领域驱动设计 (DDD)**：清晰的业务领域划分和分层架构
+- **可复用的爬虫引擎**：抽象出通用的爬虫组件，支持快速扩展新的爬虫任务
+- **IDL 驱动开发**：通过 Protocol Buffers 定义接口规范，自动生成 API 代码
+- **数据持久化**：使用 PostgreSQL + SQLAlchemy ORM
+- **代码生成工具**：类似 GORM-Gen 的模型生成器
+- **灵活配置**：支持多种爬虫策略（HTTP、Selenium、API 调用）
 
 ## 技术选型
 
-### 1. Web 框架
-**FastAPI** - 现代化的 Python Web 框架
+### 1. 架构模式
+**DDD (领域驱动设计) + Clean Architecture**
 
-**选型理由**:
-- 原生支持 async/await,性能优异
+**架构理由**：
+- 清晰的分层结构，职责分明
+- 业务逻辑与技术实现解耦
+- 易于测试和维护
+- 支持业务快速迭代
+
+### 2. IDL 定义
+**Protocol Buffers (protobuf)**
+
+**选型理由**：
+- 强类型约束，接口定义清晰
+- 跨语言支持
+- 自动生成代码
+- 便于前后端协作
+
+### 3. ORM 框架
+**SQLAlchemy 2.0**
+
+**选型理由**：
+- Python 生态最成熟的 ORM
+- 支持异步操作（asyncio）
+- 类型提示支持
+
+**自研代码生成工具**：`pkg/sql-gen` (类似 GORM-Gen)
+- 从数据库表结构自动生成 SQLAlchemy 模型
+- 配置驱动，一键生成
+- 智能类型映射
+
+### 4. 爬虫库
+- **httpx**: 异步 HTTP 客户端（推荐）
+- **lxml**: XPath 解析
+- **selenium**: 浏览器自动化（知乎等反爬场景）
+
+### 5. Web 框架
+**FastAPI** (可选，用于提供 HTTP API)
+
+**选型理由**：
+- 原生支持 async/await
 - 自动生成 OpenAPI 文档
-- 类型提示支持,开发体验好
 - 与 Pydantic 深度集成
 
-### 2. ORM 框架
-**SQLAlchemy 2.0 + Alembic**
-
-**选型理由**:
-- SQLAlchemy 是 Python 生态最成熟的 ORM
-- 2.0 版本支持类型提示,类似 GORM 的链式调用
-- Alembic 提供数据库迁移功能
-- 支持异步操作 (sqlalchemy.ext.asyncio)
-
-**代码生成工具**: sqlacodegen (类似 gorm-gen)
-```bash
-sqlacodegen postgresql://user:pass@localhost/dbname --outfile models.py
-```
-
-### 3. IDL 定义
-**Protocol Buffers (protobuf)** + **grpcio-tools**
-
-**选型理由**:
-- 跨语言支持
-- 强类型约束
-- 自动生成代码
-- FastAPI 可以通过 protobuf-to-pydantic 转换为 Pydantic 模型
-
-### 4. 爬虫相关库
-- **requests**: HTTP 请求
-- **selenium**: 浏览器自动化
-- **lxml**: XPath 解析
-- **BeautifulSoup4**: HTML 解析 (备选)
-- **httpx**: 异步 HTTP 客户端
-
-### 5. 任务调度
-**Celery** + **Redis**
-
-**选型理由**:
-- 成熟的分布式任务队列
-- 支持定时任务
-- 支持任务重试和失败处理
-
-## 项目结构
+## 项目结构 (DDD + Clean Architecture)
 
 ```
 crawler/
 ├── __init__.py
 ├── guide.md                    # 本文档
 ├── requirements.txt            # 依赖包
+├── Makefile                    # 构建脚本
+│
 ├── config/                     # 配置文件
 │   ├── __init__.py
-│   ├── settings.py            # 应用配置
-│   └── database.py            # 数据库配置
-├── proto/                      # Protocol Buffers 定义
-│   ├── crawler.proto          # 爬虫服务接口定义
-│   └── generated/             # 自动生成的 Python 代码
+│   └── config.yaml            # 统一配置（数据库、AI等）
+│
+├── idl/                        # IDL 接口定义
+│   └── crawler.proto          # Protocol Buffers 定义
+│
+├── api/                        # API 层（从 IDL 生成）
+│   ├── __init__.py
+│   └── generated/             # 自动生成的 API 代码
 │       ├── __init__.py
-│       └── crawler_pb2.py
-├── models/                     # 数据库模型
+│       ├── crawler_pb2.py     # Protobuf 消息
+│       └── crawler_pb2_grpc.py # gRPC 服务
+│
+├── internal/                   # 内部业务逻辑（核心层）
 │   ├── __init__.py
-│   ├── base.py                # 基础模型类
-│   ├── fzu_notice.py          # 福大通知模型
-│   ├── zhihu_topic.py         # 知乎话题模型
-│   └── ospp_project.py        # 开源之夏项目模型
-├── schemas/                    # Pydantic 数据模型
-│   ├── __init__.py
-│   ├── fzu_notice.py
-│   ├── zhihu_topic.py
-│   └── ospp_project.py
-├── core/                       # 核心爬虫引擎
-│   ├── __init__.py
-│   ├── base_crawler.py        # 抽象基类
-│   ├── http_crawler.py        # HTTP 爬虫基类
-│   ├── selenium_crawler.py    # Selenium 爬虫基类
-│   ├── parser.py              # 数据解析器
-│   ├── downloader.py          # 文件下载器
-│   └── middleware.py          # 中间件 (请求重试、日志等)
-├── crawlers/                   # 具体爬虫实现
-│   ├── __init__.py
-│   ├── fzu_notice.py          # 作业1: 福大教务通知
-│   ├── zhihu_topic.py         # 作业2: 知乎话题
-│   └── ospp_project.py        # 作业3: 开源之夏
-├── api/                        # API 接口
-│   ├── __init__.py
-│   ├── deps.py                # 依赖注入
-│   ├── v1/
+│   ├── application/           # 应用服务层
 │   │   ├── __init__.py
-│   │   ├── fzu_notice.py      # 福大通知接口
-│   │   ├── zhihu_topic.py     # 知乎话题接口
-│   │   └── ospp_project.py    # 开源之夏接口
-│   └── router.py              # 路由汇总
-├── tasks/                      # Celery 任务
+│   │   ├── fzu_service.py     # 福大通知应用服务
+│   │   ├── zhihu_service.py   # 知乎话题应用服务
+│   │   └── ospp_service.py    # 开源之夏应用服务
+│   │
+│   ├── domain/                # 领域层（核心业务逻辑）
+│   │   ├── __init__.py
+│   │   ├── entity/            # 领域实体
+│   │   │   ├── __init__.py
+│   │   │   ├── fzu_notice.py  # 福大通知实体
+│   │   │   ├── zhihu_topic.py # 知乎话题实体
+│   │   │   └── ospp_project.py # 开源之夏实体
+│   │   ├── repository/        # 仓储接口（抽象）
+│   │   │   ├── __init__.py
+│   │   │   ├── fzu_repository.py
+│   │   │   ├── zhihu_repository.py
+│   │   │   └── ospp_repository.py
+│   │   └── service/           # 领域服务
+│   │       ├── __init__.py
+│   │       └── crawler_service.py
+│   │
+│   └── infra/                 # 基础设施层
+│       ├── __init__.py
+│       ├── persistence/       # 持久化实现
+│       │   ├── __init__.py
+│       │   ├── database.py    # 数据库连接
+│       │   ├── fzu_repo_impl.py
+│       │   ├── zhihu_repo_impl.py
+│       │   └── ospp_repo_impl.py
+│       └── external/          # 外部服务
+│           ├── __init__.py
+│           └── crawler_client.py
+│
+├── models/                     # 数据库模型（从 sql-gen 生成）
 │   ├── __init__.py
-│   ├── celery_app.py          # Celery 配置
-│   └── crawler_tasks.py       # 爬虫异步任务
-├── utils/                      # 工具函数
+│   ├── base.py                # 基础模型
+│   ├── users.py               # 示例模型
+│   └── ...                    # 其他生成的模型
+│
+├── pkg/                        # 可复用包
 │   ├── __init__.py
-│   ├── logger.py              # 日志配置
-│   ├── csv_writer.py          # CSV 导出
-│   └── validators.py          # 数据验证
-├── migrations/                 # 数据库迁移
-│   └── versions/
+│   ├── crawler/               # 爬虫引擎包
+│   │   ├── __init__.py
+## 架构分层说明
+
+### 1. API 层 (`api/`)
+- 从 IDL (Protocol Buffers) 自动生成
+- 定义了所有的接口契约
+- 包含请求/响应消息定义
+
+### 2. 应用服务层 (`internal/application/`)
+- 编排业务流程
+- 调用领域服务和仓储
+- 处理事务边界
+- 数据转换（DTO ↔ Entity）
+
+### 3. 领域层 (`internal/domain/`)
+- **Entity**: 领域实体，包含业务逻辑
+- **Repository**: 仓储接口（抽象），定义数据访问契约
+- **Service**: 领域服务，处理跨实体的业务逻辑
+
+### 4. 基础设施层 (`internal/infra/`)
+- **Persistence**: 仓储接口的具体实现
+- **External**: 外部服务调用（如爬虫客户端）
+- 数据库连接、配置加载等
+
+### 5. 模型层 (`models/`)
+- 数据库模型（SQLAlchemy）
+- 通过 `pkg/sql-gen` 工具自动生成
+- 与领域实体分离，遵循关注点分离原则
+
+### 6. 包层 (`pkg/`)
+- 可复用的独立包
+- 爬虫引擎（`crawler`）
+- 模型生成工具（`sql-gen`）
+
+## 核心设计
+
+### 1. 爬虫基类设计 (pkg/crawler/base_crawler.py)
+│   └── sql-gen/               # 模型生成工具（类似 GORM-Gen）
+│       ├── __init__.py
+│       ├── main.py            # 生成器入口
+│       ├── config.yaml        # 生成器配置
+│       ├── config_loader.py   # 配置加载
+│       ├── db_inspector.py    # 数据库检查
+│       ├── model_generator.py # 模型生成器
+│       ├── requirements.txt   # 生成器依赖
+│       ├── README.md          # 使用文档
+│       └── generated_models/  # 生成的模型输出目录
+│
 ├── tests/                      # 测试
 │   ├── __init__.py
-│   ├── test_crawlers/
-│   └── test_api/
-├── main.py                     # FastAPI 应用入口
-├── alembic.ini                # Alembic 配置
-└── README.md                   # 项目说明
+│   ├── unit/                  # 单元测试
+│   └── integration/           # 集成测试
+│
+└── scripts/                    # 脚本
+    ├── generate_proto.sh      # 生成 Protobuf 代码
+    └── run_crawler.py         # 运行爬虫脚本
 ```
 
 ## 核心设计
@@ -136,15 +191,18 @@ crawler/
 
 ```python
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Dict, Any
+import logging
 
 class BaseCrawler(ABC):
     """爬虫抽象基类"""
     
-    def __init__(self, db_session: AsyncSession):
-        self.db_session = db_session
-        self.logger = get_logger(self.__class__.__name__)
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
     
     @abstractmethod
     async def fetch(self, **kwargs) -> List[Dict[str, Any]]:
@@ -162,17 +220,10 @@ class BaseCrawler(ABC):
         """
         pass
     
-    @abstractmethod
-    async def save(self, data: Dict[str, Any]) -> None:
-        """
-        保存数据到数据库
-        """
-        pass
-    
-    async def run(self, **kwargs) -> Dict[str, Any]:
+    async def run(self, **kwargs) -> List[Dict[str, Any]]:
         """
         执行完整的爬虫流程
-        返回: 执行结果统计
+        返回: 解析后的数据列表
         """
         try:
             # 1. 获取数据
@@ -189,30 +240,19 @@ class BaseCrawler(ABC):
                     self.logger.error(f"Parse error: {e}")
                     continue
             
-            # 3. 保存数据
-            success_count = 0
-            for data in parsed_data_list:
-                try:
-                    await self.save(data)
-                    success_count += 1
-                except Exception as e:
-                    self.logger.error(f"Save error: {e}")
-                    continue
+            return parsed_data_list
             
-            await self.db_session.commit()
-            
-            return {
-                "total": len(raw_data_list),
-                "parsed": len(parsed_data_list),
-                "saved": success_count
-            }
         except Exception as e:
-            await self.db_session.rollback()
             self.logger.error(f"Crawler run error: {e}")
             raise
 ```
 
-### 2. HTTP 爬虫基类 (core/http_crawler.py)
+**注意**: 
+- 基类不负责数据持久化（遵循单一职责）
+- 持久化由仓储层（Repository）负责
+- 爬虫只负责数据的获取和解析
+
+### 2. HTTP 爬虫基类 (pkg/crawler/http_crawler.py)
 
 ```python
 from typing import Optional
@@ -334,7 +374,235 @@ class Parser:
         return links
 ```
 
-## Protocol Buffers 接口定义 (proto/crawler.proto)
+## 从 IDL 生成 API 代码
+
+### 1. Protocol Buffers 接口定义
+
+文件位置: `idl/crawler.proto`
+
+### 2. 生成 Python 代码
+
+#### 方法一：使用 protoc 命令
+
+```bash
+# 安装 grpcio-tools
+pip install grpcio-tools
+
+# 生成 Python 代码
+python -m grpc_tools.protoc \
+    -I./idl \
+    --python_out=./api/generated \
+    --grpc_python_out=./api/generated \
+    --pyi_out=./api/generated \
+    ./idl/crawler.proto
+```
+
+#### 方法二：使用 Makefile（推荐）
+
+在 `Makefile` 中添加以下内容：
+
+```makefile
+# 生成 API 代码
+.PHONY: proto
+proto:
+	python -m grpc_tools.protoc \
+		-I./idl \
+		--python_out=./api/generated \
+		--grpc_python_out=./api/generated \
+		--pyi_out=./api/generated \
+		./idl/crawler.proto
+	@echo "✓ Protobuf 代码生成完成"
+
+# 生成数据库模型
+.PHONY: model
+model:
+	python pkg/sql-gen/main.py --config $(GEN_CONFIG_PATH)
+
+# 同时生成 API 和模型
+.PHONY: gen
+gen: proto model
+	@echo "✓ 所有代码生成完成"
+```
+
+运行：
+```bash
+make proto    # 生成 API 代码
+make model    # 生成数据库模型
+make gen      # 生成所有代码
+```
+
+#### 方法三：使用脚本
+
+创建 `scripts/generate_proto.sh`:
+
+```bash
+#!/bin/bash
+
+echo "🚀 开始生成 Protobuf 代码..."
+
+# 创建输出目录
+mkdir -p api/generated
+
+# 生成代码
+python -m grpc_tools.protoc \
+    -I./idl \
+    --python_out=./api/generated \
+    --grpc_python_out=./api/generated \
+    --pyi_out=./api/generated \
+    ./idl/crawler.proto
+
+# 生成 __init__.py
+cat > api/generated/__init__.py << 'EOF'
+"""自动生成的 Protobuf 代码"""
+from .crawler_pb2 import *
+from .crawler_pb2_grpc import *
+
+__all__ = [
+    # 请求消息
+    "FzuNoticeRequest",
+    "StartFzuCrawlerRequest",
+    "ZhihuTopicRequest",
+    "StartZhihuCrawlerRequest",
+    "OsppProjectRequest",
+    "StartOsppCrawlerRequest",
+    "ExportToCsvRequest",
+    
+    # 响应消息
+    "FzuNoticeResponse",
+    "ZhihuTopicResponse",
+    "OsppProjectResponse",
+    "ExportToCsvResponse",
+    "CrawlerResult",
+    
+    # 实体消息
+    "FzuNotice",
+    "Attachment",
+    "ZhihuQuestion",
+    "ZhihuAnswer",
+    "OsppProject",
+    
+    # 服务
+    "CrawlerServiceServicer",
+    "CrawlerServiceStub",
+]
+EOF
+
+echo "✅ Protobuf 代码生成完成！"
+echo "📁 输出目录: api/generated/"
+```
+
+运行：
+```bash
+chmod +x scripts/generate_proto.sh
+./scripts/generate_proto.sh
+```
+
+### 3. 生成的文件说明
+
+生成后会在 `api/generated/` 目录下得到：
+
+```
+api/generated/
+├── __init__.py              # 模块初始化
+├── crawler_pb2.py           # Protobuf 消息类
+├── crawler_pb2.pyi          # 类型提示文件
+└── crawler_pb2_grpc.py      # gRPC 服务类
+```
+
+### 4. 使用生成的代码
+
+#### 方式一：作为数据模型使用（推荐用于 FastAPI）
+
+```python
+from api.generated import (
+    FzuNoticeRequest,
+    FzuNoticeResponse,
+    StartFzuCrawlerRequest,
+    CrawlerResult,
+)
+
+# 在 FastAPI 路由中使用（需要转换为 Pydantic）
+from pydantic import BaseModel
+
+class FzuNoticeRequestModel(BaseModel):
+    page: int = 1
+    page_size: int = 20
+    keyword: str = None
+    
+    @staticmethod
+    def to_proto():
+        """转换为 Protobuf 消息"""
+        pass
+```
+
+#### 方式二：作为 gRPC 服务使用
+
+```python
+from api.generated import CrawlerServiceServicer
+import grpc
+from concurrent import futures
+
+class CrawlerServiceImpl(CrawlerServiceServicer):
+    """实现 gRPC 服务"""
+    
+    async def StartFzuCrawler(self, request, context):
+        # 实现逻辑
+        pass
+    
+    async def GetFzuNotices(self, request, context):
+        # 实现逻辑
+        pass
+
+# 启动 gRPC 服务器
+server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
+crawler_pb2_grpc.add_CrawlerServiceServicer_to_server(
+    CrawlerServiceImpl(), server
+)
+server.add_insecure_port('[::]:50051')
+await server.start()
+```
+
+### 5. Protobuf 转 Pydantic（用于 FastAPI）
+
+可以使用 `protobuf-to-pydantic` 库：
+
+```bash
+pip install protobuf-to-pydantic
+```
+
+或手动转换：
+
+```python
+from pydantic import BaseModel
+from typing import Optional, List
+
+# 手动定义 Pydantic 模型（与 Protobuf 对应）
+class FzuNoticeRequest(BaseModel):
+    page: int = 1
+    page_size: int = 20
+    keyword: Optional[str] = None
+
+class Attachment(BaseModel):
+    name: str
+    download_count: int
+    url: str
+
+class FzuNotice(BaseModel):
+    id: str
+    publisher: str
+    title: str
+    date: str
+    detail_url: str
+    html_content: str
+    attachments: List[Attachment] = []
+
+class FzuNoticeResponse(BaseModel):
+    notices: List[FzuNotice]
+    total: int
+    message: str
+```
+
+## Protocol Buffers 接口定义详解 (idl/crawler.proto)
 
 ```protobuf
 syntax = "proto3";
@@ -1109,8 +1377,14 @@ celery_app.conf.update(
 python -m venv venv
 source venv/bin/activate  # macOS/Linux
 
-# 安装依赖
+# 安装项目依赖
 pip install -r requirements.txt
+
+# 安装 sql-gen 工具依赖
+pip install -r pkg/sql-gen/requirements.txt
+
+# 安装 Protobuf 工具
+pip install grpcio-tools
 
 # 安装 PostgreSQL (使用 Homebrew)
 brew install postgresql@14
@@ -1119,111 +1393,265 @@ brew services start postgresql@14
 # 创建数据库
 createdb crawler
 
-# 安装 Redis
-brew install redis
-brew services start redis
+# 创建数据库用户
+createuser -s go-mcp-demo
+psql -c "ALTER USER \"go-mcp-demo\" WITH PASSWORD 'go-mcp-demo';"
 ```
 
-### 2. 初始化数据库
+### 2. 配置文件设置
 
-```bash
-# 生成迁移文件
-alembic revision --autogenerate -m "Initial migration"
+编辑 `config/config.yaml`:
 
-# 执行迁移
-alembic upgrade head
+```yaml
+pgsql:
+  host: "127.0.0.1"
+  port: 5432
+  database: "crawler"
+  user: "go-mcp-demo"
+  password: "go-mcp-demo"
+
+ai_provider:  # 可选，用于 AI 功能
+  model: "qwen3-vl-flash"
+  remote:
+    provider: "aliyun"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key: "your-api-key"
 ```
 
-### 3. 生成 Protobuf 代码
+### 3. 代码生成工作流
+
+#### 步骤 1: 生成 Protobuf API 代码
 
 ```bash
-# 安装工具
-pip install grpcio-tools protobuf-to-pydantic
+# 使用 Makefile
+make proto
 
-# 生成 Python 代码
+# 或手动执行
 python -m grpc_tools.protoc \
-    -I./proto \
-    --python_out=./proto/generated \
-    --grpc_python_out=./proto/generated \
-    ./proto/crawler.proto
-
-# 转换为 Pydantic 模型 (用于 FastAPI)
-# 手动或使用工具转换
+    -I./idl \
+    --python_out=./api/generated \
+    --grpc_python_out=./api/generated \
+    --pyi_out=./api/generated \
+    ./idl/crawler.proto
 ```
 
-### 4. 启动服务
+#### 步骤 2: 设计数据库表结构
+
+在 PostgreSQL 中创建表：
+
+```sql
+-- 福大教务通知表
+CREATE TABLE fzu_notices (
+    id SERIAL PRIMARY KEY,
+    publisher VARCHAR(100) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    publish_date VARCHAR(20) NOT NULL,
+    detail_url VARCHAR(500) UNIQUE NOT NULL,
+    html_content TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 附件表
+CREATE TABLE fzu_notice_attachments (
+    id SERIAL PRIMARY KEY,
+    notice_id INTEGER REFERENCES fzu_notices(id) ON DELETE CASCADE,
+    name VARCHAR(500) NOT NULL,
+    download_count INTEGER DEFAULT 0,
+    url VARCHAR(500) NOT NULL,
+    local_path VARCHAR(1000),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 知乎问题表
+CREATE TABLE zhihu_questions (
+    id SERIAL PRIMARY KEY,
+    question_id VARCHAR(50) UNIQUE NOT NULL,
+    topic_id VARCHAR(50) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    content TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 知乎回答表
+CREATE TABLE zhihu_answers (
+    id SERIAL PRIMARY KEY,
+    question_id INTEGER REFERENCES zhihu_questions(id) ON DELETE CASCADE,
+    answer_id VARCHAR(50) UNIQUE NOT NULL,
+    author VARCHAR(200),
+    content TEXT NOT NULL,
+    vote_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 开源之夏项目表
+CREATE TABLE ospp_projects (
+    id SERIAL PRIMARY KEY,
+    project_id VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(500) NOT NULL,
+    difficulty VARCHAR(50),
+    tech_tags TEXT[],  -- PostgreSQL 数组类型
+    description TEXT,
+    requirements TEXT,
+    pdf_url VARCHAR(500),
+    pdf_local_path VARCHAR(1000),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+```
+
+#### 步骤 3: 生成数据库模型
 
 ```bash
-# 启动 FastAPI 应用
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 使用 Makefile
+make model
 
-# 启动 Celery Worker
-celery -A tasks.celery_app worker --loglevel=info
+# 或手动执行
+python pkg/sql-gen/main.py --config pkg/sql-gen/config.yaml
 
-# 启动 Celery Beat (定时任务)
-celery -A tasks.celery_app beat --loglevel=info
+# 生成指定表的模型
+python pkg/sql-gen/main.py -t fzu_notices fzu_notice_attachments
+
+# 列出所有表
+python pkg/sql-gen/main.py --list-tables
 ```
 
-### 5. 测试爬虫
+生成的模型会在 `pkg/sql-gen/generated_models/` 目录，需要手动复制到 `models/` 目录：
 
 ```bash
-# 使用 curl 或 httpie 测试
-curl -X POST http://localhost:8000/api/v1/fzu/start-crawler \
-  -H "Content-Type: application/json" \
-  -d '{"target_count": 500}'
-
-# 查询结果
-curl http://localhost:8000/api/v1/fzu/notices?page=1&page_size=20
+# 复制生成的模型
+cp pkg/sql-gen/generated_models/*.py models/
 ```
 
-## 依赖清单 (requirements.txt)
+#### 步骤 4: 一键生成所有代码
+
+```bash
+make gen  # 生成 API + 模型
+```
+
+### 4. 开发业务逻辑
+
+#### 创建爬虫实现
+
+在 `internal/infra/external/` 创建具体的爬虫实现：
+
+```python
+# internal/infra/external/fzu_crawler.py
+from pkg.crawler.http_crawler import HttpCrawler
+
+class FzuNoticeCrawler(HttpCrawler):
+    async def fetch(self, **kwargs):
+        # 实现爬取逻辑
+        pass
+    
+    async def parse(self, raw_data):
+        # 实现解析逻辑
+        pass
+```
+
+#### 创建仓储实现
+
+在 `internal/infra/persistence/` 实现数据持久化：
+
+```python
+# internal/infra/persistence/fzu_repo_impl.py
+from internal.domain.repository.fzu_repository import FzuRepository
+from models.fzu_notices import FzuNotices
+
+class FzuRepositoryImpl(FzuRepository):
+    def __init__(self, db_session):
+        self.db = db_session
+    
+    async def save(self, notice_data):
+        # 保存到数据库
+        pass
+    
+    async def find_all(self, page, page_size):
+        # 查询数据
+        pass
+```
+
+#### 创建应用服务
+
+在 `internal/application/` 编排业务流程：
+
+```python
+# internal/application/fzu_service.py
+class FzuNoticeService:
+    def __init__(self, repository, crawler):
+        self.repository = repository
+        self.crawler = crawler
+    
+    async def start_crawl(self, target_count):
+        # 1. 调用爬虫获取数据
+        data = await self.crawler.run(target_count=target_count)
+        
+        # 2. 保存到数据库
+        for item in data:
+            await self.repository.save(item)
+        
+        return {"success": True, "count": len(data)}
+    
+    async def get_notices(self, page, page_size):
+        return await self.repository.find_all(page, page_size)
+```
+
+### 5. 测试运行
+
+```bash
+# 测试爬虫
+python scripts/run_crawler.py --crawler fzu --count 500
+
+# 测试数据库连接
+python -c "from models import Base; print('Models loaded successfully')"
+
+# 测试 Protobuf
+python -c "from api.generated import FzuNoticeRequest; print('Protobuf loaded')"
+```
+
+## 依赖清单
+
+### 主项目依赖 (requirements.txt)
 
 ```txt
-# Web 框架
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-
 # 数据库
-sqlalchemy[asyncio]==2.0.23
-asyncpg==0.29.0
-alembic==1.13.0
+sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 
-# ORM 工具
-sqlacodegen==3.0.0rc5
-
 # 爬虫相关
-requests==2.31.0
 httpx==0.25.2
 lxml==4.9.3
-beautifulsoup4==4.12.2
 selenium==4.15.2
-webdriver-manager==4.0.1
 
-# 任务队列
-celery==5.3.4
-redis==5.0.1
+# 配置
+pyyaml==6.0.1
 
 # Protobuf
 protobuf==4.25.1
 grpcio==1.60.0
 grpcio-tools==1.60.0
 
-# 工具库
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-dotenv==1.0.0
+# Web 框架 (可选)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
 
-# 测试
+# 测试 (可选)
 pytest==7.4.3
 pytest-asyncio==0.21.1
-httpx==0.25.2
+```
 
-# 日志
-loguru==0.7.2
+### sql-gen 工具依赖 (pkg/sql-gen/requirements.txt)
+
+```txt
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+pyyaml==6.0.1
+typing-extensions==4.9.0
 ```
 
 ## 开发建议
@@ -1310,22 +1738,169 @@ class CsvWriter:
                     })
 ```
 
+## 快速开始清单
+
+### 新项目初始化
+
+```bash
+# 1. 克隆项目
+git clone <your-repo>
+cd crawler
+
+# 2. 创建虚拟环境
+python -m venv venv
+source venv/bin/activate
+
+# 3. 安装依赖
+pip install -r requirements.txt
+pip install -r pkg/sql-gen/requirements.txt
+
+# 4. 配置数据库
+createdb crawler
+# 编辑 config/config.yaml
+
+# 5. 创建数据库表
+psql -d crawler -f schema.sql
+
+# 6. 生成代码
+make gen  # 生成 API + 模型
+
+# 7. 开始开发
+# - 在 internal/infra/external/ 实现爬虫
+# - 在 internal/infra/persistence/ 实现仓储
+# - 在 internal/application/ 实现应用服务
+```
+
+### 常用命令
+
+```bash
+# 代码生成
+make proto          # 生成 Protobuf API
+make model          # 生成数据库模型
+make gen            # 生成所有代码
+
+# 查看数据库表
+make model --list-tables
+
+# 运行测试
+pytest tests/
+
+# 代码格式化
+black .
+isort .
+```
+
+## 架构优势
+
+### 1. **清晰的分层结构**
+- API 层：接口定义
+- 应用层：业务编排
+- 领域层：核心业务
+- 基础设施层：技术实现
+
+### 2. **高度可测试**
+- 每层独立测试
+- 接口依赖注入
+- Mock 友好
+
+### 3. **易于维护**
+- 关注点分离
+- 低耦合高内聚
+- 业务逻辑与技术实现解耦
+
+### 4. **扩展性强**
+- 新增爬虫：继承 `BaseCrawler`
+- 新增数据源：实现 `Repository` 接口
+- 新增业务：在应用层编排
+
+### 5. **代码生成**
+- IDL → API 代码（Protobuf）
+- 数据库 → 模型代码（sql-gen）
+- 减少重复劳动
+
+## 常见问题
+
+### Q1: 为什么要分这么多层？
+**A**: 遵循 Clean Architecture 原则，保证：
+- 业务逻辑不依赖框架
+- 易于测试
+- 技术栈可替换
+
+### Q2: 爬虫为什么不直接保存数据？
+**A**: 遵循单一职责原则：
+- 爬虫只负责数据获取和解析
+- 仓储负责数据持久化
+- 便于单元测试和复用
+
+### Q3: 为什么使用 Protobuf？
+**A**: 
+- 强类型约束
+- 跨语言支持
+- 接口即文档
+- 便于前后端协作
+
+### Q4: sql-gen 生成的模型如何使用？
+**A**: 
+```bash
+# 生成模型
+make model
+
+# 复制到项目
+cp pkg/sql-gen/generated_models/*.py models/
+
+# 在代码中使用
+from models.fzu_notices import FzuNotices
+```
+
+## 进阶扩展
+
+### 1. 添加缓存层
+在 `internal/infra/` 添加 Redis 缓存实现
+
+### 2. 添加消息队列
+使用 Celery 处理异步爬虫任务
+
+### 3. 添加监控
+- Prometheus + Grafana
+- 爬虫任务监控
+- 性能指标收集
+
+### 4. 容器化部署
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
+```
+
+## 参考资料
+
+- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- [Domain-Driven Design](https://martinfowler.com/bliki/DomainDrivenDesign.html)
+- [Protocol Buffers](https://protobuf.dev/)
+- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
+
 ## 总结
 
-这个项目架构具有以下特点:
+这个项目架构具有以下特点：
 
-1. **高度模块化**: 核心爬虫引擎与具体实现分离
-2. **可扩展性强**: 新增爬虫只需继承基类并实现三个方法
-3. **技术栈现代**: 使用 FastAPI + SQLAlchemy 2.0 + async/await
-4. **接口规范**: 通过 Protobuf 定义清晰的接口契约
-5. **生产就绪**: 包含异步任务、数据库迁移、错误处理等完整功能
+1. **DDD + Clean Architecture**：清晰的分层和职责划分
+2. **代码生成驱动**：IDL → API，数据库 → 模型
+3. **高度模块化**：爬虫引擎、模型生成器独立可复用
+4. **易于扩展**：新增功能只需实现接口
+5. **生产就绪**：完整的错误处理、日志、测试支持
 
 ## 下一步
 
-1. 完善配置文件 (.env)
-2. 实现具体的爬虫逻辑
-3. 编写单元测试
-4. 添加 API 文档 (FastAPI 自动生成)
-5. 部署上线 (Docker + Nginx)
+1. ✅ 完成环境搭建和配置
+2. ✅ 生成 API 和模型代码
+3. 🔲 实现福大教务通知爬虫
+4. 🔲 实现知乎话题爬虫
+5. 🔲 实现开源之夏爬虫
+6. 🔲 编写单元测试
+7. 🔲 添加 FastAPI HTTP 服务（可选）
+8. 🔲 容器化部署（可选）
 
-有问题随时提问! 🚀
+有问题随时提问！🚀

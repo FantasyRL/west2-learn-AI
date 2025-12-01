@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package crawler;
+
+// ==================== 福大教务通知 ====================
+
+message FzuNoticeRequest {
+  int32 page = 1;           // 页码
+  int32 page_size = 2;      // 每页数量
+  optional string keyword = 3;  // 搜索关键词
+}
+
+message FzuNotice {
+  string id = 1;
+  string publisher = 2;     // 通知人
+  string title = 3;         // 标题
+  string date = 4;          // 日期
+  string detail_url = 5;    // 详情链接
+  string html_content = 6;  // 详情 HTML
+  repeated Attachment attachments = 7;  // 附件列表
+}
+
+message Attachment {
+  string name = 1;          // 附件名
+  int32 download_count = 2; // 下载次数
+  string url = 3;           // 附件链接
+}
+
+message FzuNoticeResponse {
+  repeated FzuNotice notices = 1;
+  int32 total = 2;
+  string message = 3;
+}
+
+message StartFzuCrawlerRequest {
+  int32 target_count = 1;   // 目标爬取数量 (至少500)
+}
+
+message CrawlerResult {
+  bool success = 1;
+  string message = 2;
+  int32 crawled_count = 3;
+}
+
+// ==================== 知乎话题 ====================
+
+message ZhihuTopicRequest {
+  string topic_id = 1;      // 话题ID
+  int32 question_limit = 2; // 问题数量限制
+  int32 answer_limit = 3;   // 每个问题的回答数量限制
+}
+
+message ZhihuQuestion {
+  string id = 1;
+  string title = 2;         // 问题标题
+  string content = 3;       // 问题详细内容
+  repeated ZhihuAnswer answers = 4;
+}
+
+message ZhihuAnswer {
+  string id = 1;
+  string content = 2;       // 回答内容 (纯文本)
+  int32 vote_count = 3;     // 赞同数
+  string author = 4;        // 作者
+}
+
+message ZhihuTopicResponse {
+  repeated ZhihuQuestion questions = 1;
+  string message = 2;
+}
+
+message StartZhihuCrawlerRequest {
+  string topic_url = 1;
+  int32 question_count = 2;
+  int32 answer_per_question = 3;
+}
+
+// ==================== 开源之夏 ====================
+
+message OsppProjectRequest {
+  optional string keyword = 1;      // 搜索关键词
+  optional string difficulty = 2;   // 难度筛选
+  optional string tech_tag = 3;     // 技术标签筛选
+}
+
+message OsppProject {
+  string id = 1;
+  string name = 2;          // 项目名
+  string difficulty = 3;    // 难度
+  repeated string tech_tags = 4;  // 技术标签
+  string description = 5;   // 项目简述
+  string requirements = 6;  // 产出要求
+  optional string pdf_url = 7;    // 申请书PDF链接
+}
+
+message OsppProjectResponse {
+  repeated OsppProject projects = 1;
+  int32 total = 2;
+  string message = 3;
+}
+
+message StartOsppCrawlerRequest {
+  bool download_pdf = 1;    // 是否下载PDF
+}
+
+// ==================== 导出接口 ====================
+
+message ExportToCsvRequest {
+  string crawler_type = 1;  // "fzu" | "zhihu" | "ospp"
+  optional string output_path = 2;
+}
+
+message ExportToCsvResponse {
+  bool success = 1;
+  string file_path = 2;
+  string message = 3;
+}
+
+// ==================== 服务定义 ====================
+
+service CrawlerService {
+  // 福大教务通知
+  rpc StartFzuCrawler(StartFzuCrawlerRequest) returns (CrawlerResult);
+  rpc GetFzuNotices(FzuNoticeRequest) returns (FzuNoticeResponse);
+
+  // 知乎话题
+  //rpc StartZhihuCrawler(StartZhihuCrawlerRequest) returns (CrawlerResult);
+  //rpc GetZhihuTopics(ZhihuTopicRequest) returns (ZhihuTopicResponse);
+
+  // 开源之夏
+  //rpc StartOsppCrawler(StartOsppCrawlerRequest) returns (CrawlerResult);
+  //rpc GetOsppProjects(OsppProjectRequest) returns (OsppProjectResponse);
+
+  // 通用导出
+  //rpc ExportToCsv(ExportToCsvRequest) returns (ExportToCsvResponse);
+}

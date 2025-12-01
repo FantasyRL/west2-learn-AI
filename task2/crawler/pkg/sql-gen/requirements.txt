@@ -1,0 +1,10 @@
+# SQL 依赖包
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# 配置文件解析
+pyyaml==6.0.1
+
+# 类型提示
+typing-extensions==4.9.0
